@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MAS-04 · Multi-Agent Framework</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#04050a;--s1:#080c14;--s2:#0c1220;--s3:#101828;
+  --border:#1a2540;--border2:#243050;
+  --orch:#f59e0b;--res:#06b6d4;--plan:#10b981;--exec:#8b5cf6;--crit:#ef4444;
+  --text:#d4dff0;--muted:#4a5a7a;--dim:#0e1520;
+  --mono:'IBM Plex Mono',monospace;--ui:'Space Grotesk',sans-serif;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--ui);overflow-x:hidden}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#1a2540;border-radius:2px}
+
+@keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100vh)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes glow{0%,100%{box-shadow:0 0 8px currentColor,0 0 18px currentColor}50%{box-shadow:0 0 18px currentColor,0 0 40px currentColor}}
+@keyframes flow{to{stroke-dashoffset:-20}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes ripple{0%{transform:scale(1);opacity:.5}100%{transform:scale(2.4);opacity:0}}
+@keyframes shimmer{0%{background-position:200% center}100%{background-position:-200% center}}
+
+.fade-up{animation:fadeUp .35s ease forwards}
+.spin-anim{animation:spin .75s linear infinite}
+.blink-anim{animation:blink 1s step-end infinite}
+
+/* ── Layout ── */
+.wrap{display:grid;grid-template-rows:auto 1fr;min-height:100vh;max-width:1440px;margin:0 auto;padding:0 20px 48px}
+
+/* ── Header ── */
+header{padding:16px 0 14px;border-bottom:1px solid var(--border);margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-box{width:36px;height:36px;border-radius:7px;background:linear-gradient(135deg,#0d1b30,#162745);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:15px}
+.logo h1{font-size:15px;font-weight:700;letter-spacing:-.2px}
+.logo-sub{font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:2px;margin-top:2px}
+.hdr-right{display:flex;align-items:center;gap:10px}
+.pill{display:flex;align-items:center;gap:6px;padding:4px 11px;background:var(--s1);border:1px solid var(--border);border-radius:20px;font-family:var(--mono);font-size:9px;color:var(--muted)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.dot.active{background:#10b981;box-shadow:0 0 6px #10b981;animation:pulse 1.4s infinite}
+.dot.running{background:var(--orch);box-shadow:0 0 6px var(--orch);animation:pulse .7s infinite}
+.dot.error{background:var(--crit)}
+
+/* ── Main grid ── */
+.main{display:grid;grid-template-columns:290px 1fr;gap:16px;align-items:start}
+
+/* ── Panels ── */
+.panel{background:var(--s1);border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.ph{padding:9px 15px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.ph-lbl{font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
+.left{display:flex;flex-direction:column;gap:12px}
+
+/* ── Inputs ── */
+.inpad{padding:12px}
+.flbl{font-family:var(--mono);font-size:8px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:5px}
+textarea.tinput{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:var(--ui);font-size:12px;line-height:1.6;padding:9px 11px;outline:none;resize:none;height:90px;transition:border-color .2s}
+textarea.tinput:focus{border-color:var(--border2)}
+textarea.tinput::placeholder{color:var(--muted)}
+.row{display:flex;gap:6px;margin-top:9px}
+input.kinput{flex:1;background:var(--s2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:10px;padding:7px 10px;outline:none;transition:border-color .2s;min-width:0}
+input.kinput:focus{border-color:var(--border2)}
+input.kinput::placeholder{color:var(--muted)}
+select.msel{width:100%;background:var(--s2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:10px;padding:7px 10px;outline:none;cursor:pointer}
+select.msel option{background:var(--s2)}
+.sbtns{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+
+/* ── Run button ── */
+.run-btn{width:100%;padding:12px;background:linear-gradient(135deg,rgba(6,182,212,.12),rgba(6,182,212,.05));border:1px solid rgba(6,182,212,.3);border-radius:7px;color:var(--res);font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:2px;cursor:pointer;transition:all .25s;display:flex;align-items:center;justify-content:center;gap:8px}
+.run-btn:hover:not(:disabled){background:linear-gradient(135deg,rgba(6,182,212,.2),rgba(6,182,212,.08));box-shadow:0 0 22px rgba(6,182,212,.18);border-color:rgba(6,182,212,.55)}
+.run-btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* ── Small buttons ── */
+.sbtn{background:var(--s2);border:1px solid var(--border);border-radius:4px;color:var(--muted);font-family:var(--mono);font-size:8px;letter-spacing:1px;padding:3px 9px;cursor:pointer;transition:all .2s}
+.sbtn:hover{color:var(--text);border-color:var(--border2)}
+.sbtn.danger:hover{color:var(--crit);border-color:rgba(239,68,68,.35)}
+
+/* ── RAG ── */
+.ragpad{padding:10px}
+.rag-doc{display:flex;align-items:flex-start;gap:7px;padding:7px;background:var(--s2);border:1px solid var(--border);border-radius:5px;margin-bottom:5px;cursor:pointer;transition:border-color .2s}
+.rag-doc:hover{border-color:var(--border2)}
+.rag-doc input[type=checkbox]{accent-color:var(--res);margin-top:2px;flex-shrink:0}
+.rag-dtitle{font-size:10px;font-weight:600;color:var(--text);margin-bottom:1px}
+.rag-dprev{font-family:var(--mono);font-size:8px;color:var(--muted);line-height:1.5}
+.rag-add{display:flex;flex-direction:column;gap:5px;padding-top:7px;border-top:1px solid var(--border);margin-top:5px}
+input.ri,textarea.rc{background:var(--s2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:9px;padding:5px 9px;outline:none;width:100%;transition:border-color .2s}
+input.ri:focus,textarea.rc:focus{border-color:var(--border2)}
+textarea.rc{resize:none;height:44px}
+input.ri::placeholder,textarea.rc::placeholder{color:var(--muted)}
+
+/* ── Pipeline bar ── */
+.pbar{padding:16px 20px;display:flex;align-items:center;overflow-x:auto;gap:0}
+.anode{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:80px}
+.aring{width:52px;height:52px;border-radius:50%;border:2px solid var(--border);background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:17px;position:relative;transition:all .4s ease}
+.aring.active{animation:glow .9s ease-in-out infinite}
+.aring.done{background:rgba(16,185,129,.08)!important}
+.aring.error-st{border-color:var(--crit)!important}
+.done-badge{position:absolute;bottom:-3px;right:-3px;width:15px;height:15px;border-radius:50%;background:#10b981;border:2px solid var(--s1);display:flex;align-items:center;justify-content:center;font-size:7px;color:#fff;font-weight:700}
+.err-badge{position:absolute;bottom:-3px;right:-3px;width:15px;height:15px;border-radius:50%;background:var(--crit);border:2px solid var(--s1);display:flex;align-items:center;justify-content:center;font-size:7px;color:#fff;font-weight:700}
+.ripple-ring{position:absolute;inset:-6px;border-radius:50%;border:2px solid currentColor;opacity:0;animation:ripple 1.4s ease-out infinite}
+.aname{font-family:var(--mono);font-size:7px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.aname.lit{color:var(--text)}
+.astat-lbl{font-family:var(--mono);font-size:8px;color:var(--muted)}
+.astat-lbl.asi-lit{color:var(--res)}
+.conn{flex:1;min-width:12px;height:2px;background:var(--border);position:relative;margin-bottom:20px;transition:background .35s}
+.conn.on{background:var(--res)}
+.conn::after{content:'';position:absolute;right:-5px;top:-4px;border:5px solid transparent;border-left-color:var(--border);transition:border-left-color .35s}
+.conn.on::after{border-left-color:var(--res)}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:1px;padding:9px 13px 0;border-bottom:1px solid var(--border)}
+.tab{padding:6px 13px;border-radius:4px 4px 0 0;font-family:var(--mono);font-size:9px;letter-spacing:1px;color:var(--muted);cursor:pointer;border:1px solid transparent;border-bottom:none;background:transparent;transition:all .2s;text-transform:uppercase}
+.tab.on{color:var(--res);background:var(--s2);border-color:var(--border)}
+.tbody{display:none;overflow-y:auto;max-height:480px}
+.tbody.on{display:block}
+
+/* ── Output cards ── */
+.olist{display:flex;flex-direction:column;gap:9px;padding:12px}
+.ocard{background:var(--s2);border:1px solid var(--border);border-radius:7px;overflow:hidden;opacity:0;transform:translateY(8px);transition:opacity .3s ease,transform .3s ease,border-color .3s}
+.ocard.show{opacity:1;transform:translateY(0)}
+.ocard.streaming{border-color:rgba(6,182,212,.28)}
+.ocard-hdr{padding:8px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px}
+.ocard-icon{font-size:13px}
+.ocard-name{font-size:11px;font-weight:600;flex:1}
+.ometa{font-family:var(--mono);font-size:8px;color:var(--muted);display:flex;gap:7px;align-items:center}
+.obadge{padding:2px 7px;border-radius:9px;font-size:8px;font-family:var(--mono)}
+.obody{padding:11px 13px;font-family:var(--mono);font-size:10px;line-height:1.85;color:#9ab0cc;white-space:pre-wrap;word-break:break-word}
+.obody.cur::after{content:'▋';animation:blink 0.6s infinite;color:var(--res)}
+
+/* ── Empty state ── */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:220px;gap:8px;color:var(--muted)}
+.empty .ei{font-size:28px;opacity:.2}
+.empty p{font-family:var(--mono);font-size:9px;letter-spacing:1px}
+
+/* ── Metrics ── */
+.mwrap{padding:12px;display:flex;flex-direction:column;gap:14px}
+.msumm{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.mcard{background:var(--s2);border:1px solid var(--border);border-radius:5px;padding:9px;text-align:center}
+.mcard .mv{font-family:var(--mono);font-size:16px;font-weight:700;margin-bottom:2px}
+.mcard .ml{font-family:var(--mono);font-size:7px;color:var(--muted);letter-spacing:1px}
+.amet{margin-bottom:10px}
+.amhd{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.amname{font-family:var(--mono);font-size:9px;font-weight:500}
+.amasi{font-family:var(--mono);font-size:10px;font-weight:700}
+.track{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:3px}
+.fill{height:100%;border-radius:2px;width:0;transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+.dims{display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-top:4px}
+.dim-row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:7px}
+.dim-l{color:var(--muted)}.dim-v{}
+
+/* ── Memory ── */
+.memlist{padding:12px;display:flex;flex-direction:column;gap:5px}
+.mentry{display:flex;font-family:var(--mono);font-size:9px;background:var(--s2);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.mns{padding:5px 9px;min-width:85px;font-weight:600;border-right:1px solid var(--border)}
+.mkey{padding:5px 9px;min-width:85px;color:var(--orch);border-right:1px solid var(--border)}
+.mval{padding:5px 9px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+
+/* ── Roster ── */
+.roster{display:flex;flex-direction:column;gap:0;padding:10px}
+.arow{display:flex;align-items:center;gap:9px;padding:7px 3px;border-bottom:1px solid var(--border)}
+.arow:last-child{border:none}
+.ar-ic{font-size:13px;width:20px;text-align:center}
+.ar-inf{flex:1}
+.ar-nm{font-size:10px;font-weight:600;margin-bottom:1px}
+.ar-rl{font-family:var(--mono);font-size:8px;color:var(--muted);line-height:1.4}
+.ar-st{font-family:var(--mono);font-size:7px;letter-spacing:1px}
+
+/* ── Run history ── */
+.rhist{padding:12px;display:flex;flex-direction:column;gap:5px}
+.hrow{display:flex;align-items:center;gap:9px;padding:7px 11px;background:var(--s2);border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:9px;cursor:pointer;transition:border-color .2s}
+.hrow:hover{border-color:var(--border2)}
+.hid{color:var(--res);min-width:80px}
+.htask{color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hmeta{color:var(--muted);white-space:nowrap}
+.hbadge{padding:2px 7px;border-radius:9px;font-size:7px;background:rgba(16,185,129,.1);color:#10b981}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:22px;right:22px;z-index:200;background:#18090a;border:1px solid rgba(239,68,68,.35);border-radius:7px;padding:11px 15px;max-width:340px;font-family:var(--mono);font-size:10px;color:#fca5a5;display:none;animation:fadeUp .3s ease}
+.toast.show{display:block}
+
+/* ── BG ── */
+.bgrid{position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(6,182,212,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(6,182,212,.018) 1px,transparent 1px);background-size:50px 50px}
+.bscan{position:fixed;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(6,182,212,.07),transparent);animation:scan 7s linear infinite;pointer-events:none;z-index:0}
+.z1{position:relative;z-index:1}
+</style>
+</head>
+<body>
+<div class="bgrid"></div>
+<div class="bscan"></div>
+
+<div class="wrap z1">
+<header>
+  <div class="logo">
+    <div class="logo-box">🤖</div>
+    <div>
+      <h1>MAS-04 · Multi-Agent Framework</h1>
+      <div class="logo-sub">sequential · memory · rag · tools · asi eval</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="pill" id="timerPill" style="display:none">
+      <span style="color:var(--orch)" id="timerVal">0.0s</span>
+    </div>
+    <div class="pill">
+      <div class="dot" id="sdot"></div>
+      <span id="slabel">idle</span>
+    </div>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- ── LEFT ── -->
+  <div class="left">
+
+    <!-- Task + API config -->
+    <div class="panel">
+      <div class="ph"><span class="ph-lbl">◈ Task Input</span></div>
+      <div class="inpad">
+        <div class="flbl">Prompt</div>
+        <textarea class="tinput" id="task" placeholder="e.g. Analyze context drift in LLM multi-agent systems and propose mitigation strategies using the ASI metric..."></textarea>
+
+        <div class="flbl" style="margin-top:11px">API Key (OpenAI or Anthropic)</div>
+        <div class="row">
+          <input class="kinput" id="apikey" type="password" placeholder="sk-... or sk-ant-..."/>
+          <button class="sbtn" id="visBtn" onclick="toggleVis()">SHOW</button>
+        </div>
+
+        <div class="flbl" style="margin-top:9px">Provider</div>
+        <select class="msel" id="provider" onchange="updateModelOptions()">
+          <option value="auto">Auto-detect from key</option>
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+        </select>
+
+        <div class="flbl" style="margin-top:9px">Model</div>
+        <select class="msel" id="model">
+          <option value="gpt-4o-mini">gpt-4o-mini (default · fast)</option>
+          <option value="gpt-4o">gpt-4o (higher quality)</option>
+          <option value="gpt-3.5-turbo">gpt-3.5-turbo (cheapest)</option>
+        </select>
+
+        <div class="sbtns" id="samples"></div>
+      </div>
+    </div>
+
+    <!-- RAG docs -->
+    <div class="panel">
+      <div class="ph">
+        <span class="ph-lbl">⬡ RAG Documents</span>
+        <button class="sbtn" onclick="toggleRagAdd()">+ Add</button>
+      </div>
+      <div class="ragpad" id="ragPad">
+        <div id="ragList"></div>
+        <div class="rag-add" id="ragForm" style="display:none">
+          <input class="ri" id="rTitle" placeholder="Document title…"/>
+          <textarea class="rc" id="rContent" placeholder="Document content…"></textarea>
+          <button class="sbtn" onclick="addRag()" style="width:100%;padding:4px 0;text-align:center;letter-spacing:1px">SAVE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Run -->
+    <button class="run-btn" id="runBtn" onclick="runPipeline()">
+      <span id="runIcon">▶</span>
+      <span id="runLbl">EXECUTE PIPELINE</span>
+    </button>
+
+    <!-- Agent Roster -->
+    <div class="panel">
+      <div class="ph"><span class="ph-lbl">▣ Agents</span></div>
+      <div class="roster" id="roster"></div>
+    </div>
+
+  </div>
+
+  <!-- ── RIGHT ── -->
+  <div style="display:flex;flex-direction:column;gap:14px">
+
+    <!-- Pipeline DAG -->
+    <div class="panel">
+      <div class="ph"><span class="ph-lbl">◎ Pipeline DAG</span></div>
+      <div class="pbar" id="pbar"></div>
+    </div>
+
+    <!-- Tabs + content -->
+    <div class="panel">
+      <div class="tabs">
+        <button class="tab on"  onclick="sw('output',this)">Output</button>
+        <button class="tab"     onclick="sw('metrics',this)">ASI Metrics</button>
+        <button class="tab"     onclick="sw('memory',this)">Memory</button>
+        <button class="tab"     onclick="sw('history',this)">Run History</button>
+      </div>
+      <div class="tbody on" id="tb-output">
+        <div class="olist" id="olist">
+          <div class="empty"><div class="ei">🔬</div><p>ENTER A TASK AND HIT EXECUTE</p></div>
+        </div>
+      </div>
+      <div class="tbody" id="tb-metrics">
+        <div class="mwrap" id="mwrap">
+          <div class="empty"><div class="ei">📊</div><p>METRICS APPEAR AFTER PIPELINE RUN</p></div>
+        </div>
+      </div>
+      <div class="tbody" id="tb-memory">
+        <div class="memlist" id="memlist">
+          <div class="empty"><div class="ei">🧠</div><p>MEMORY LOG APPEARS DURING RUN</p></div>
+        </div>
+      </div>
+      <div class="tbody" id="tb-history">
+        <div class="rhist" id="rhist">
+          <div class="empty"><div class="ei">📋</div><p>NO RUNS YET</p></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// AGENTS — exact system prompts from agents/builtin/*.py
+// ════════════════════════════════════════════════════════════════
+const AGENTS = [
+  { id:'orchestrator', name:'Orchestrator', icon:'◈', color:'#f59e0b', role:'Decomposes tasks and delegates to specialist agents',
+    prompt:'You are the Orchestrator in a multi-agent AI system. Your job is to receive a task, break it into clear subtasks, and describe which specialist agent should handle each part. Be concise, structured, and precise. Max 150 words.' },
+  { id:'researcher', name:'Researcher', icon:'⬡', color:'#06b6d4', role:'Gathers context, identifies constraints and prior art',
+    prompt:'You are the Researcher agent. Given a task, identify relevant background knowledge, constraints, risks, and reference points. Structure your findings clearly. Max 150 words.' },
+  { id:'planner', name:'Planner', icon:'◎', color:'#10b981', role:'Creates a structured execution roadmap',
+    prompt:'You are the Planner agent. Based on the task and research context, create a clear phased execution plan with steps, dependencies, and estimates. Max 150 words.' },
+  { id:'executor', name:'Executor', icon:'▣', color:'#8b5cf6', role:'Implements the plan and produces deliverables',
+    prompt:'You are the Executor agent. Take the plan and produce concrete output — code, prose, decisions, or structured data. Be specific and actionable. Max 200 words.' },
+  { id:'critic', name:'Critic', icon:'◬', color:'#ef4444', role:'Reviews output quality and flags gaps',
+    prompt:'You are the Critic agent. Review the executor\'s output against the original task. Score it 0-100, list strengths, gaps, and concrete improvements. Max 150 words.' },
+];
+
+// ════════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════════
+const API_BASE = (location.hostname==='localhost'||location.hostname==='127.0.0.1') ? 'http://localhost:8000' : '';
+
+let ragDocs = [
+  { id:'d1', title:'Context Drift Definition', content:'Context drift: gradual divergence of agent output from original task intent across multi-turn interactions. Common in sequential pipelines with 3+ agents.' },
+  { id:'d2', title:'ASI Metric Weights', content:'ASI = 0.30×ResponseConsistency + 0.25×ReasoningStability + 0.35×TaskAdherence + 0.10×LatencyStability. Range 0–100.' },
+  { id:'d3', title:'Framework Comparison', content:'LangGraph, CrewAI, AutoGen show different drift patterns. AutoGen highest drift in hierarchical setups. LangGraph most stable (explicit state graph).' },
+];
+let selRag = new Set(['d1','d2','d3']);
+let statuses = {};
+let memStore = {};
+let asiHist  = {};
+let runHist  = [];
+let running  = false;
+let showKey  = false;
+let ragOpen  = false;
+let timer    = null;
+let t0       = null;
+
+// ════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════
+function init() {
+  AGENTS.forEach(a => { statuses[a.id]='idle'; memStore[a.id]=[]; asiHist[a.id]=[]; });
+  renderPipeline(); renderRoster(); renderRag();
+  document.getElementById('samples').innerHTML = [
+    'Analyze context drift in LLM multi-agent systems',
+    'Design a pipeline integrity SCC risk scoring ML model',
+    'Build a real-time order tracking microservice',
+  ].map(s=>`<button class="sbtn" onclick="setTask('${s}')" style="font-size:7px;padding:2px 6px">${s.slice(0,32)}…</button>`).join('');
+}
+function setTask(t){document.getElementById('task').value=t}
+
+// ════════════════════════════════════════════════════════════════
+// MODEL OPTIONS — switch based on provider
+// ════════════════════════════════════════════════════════════════
+function updateModelOptions() {
+  const p = document.getElementById('provider').value;
+  const sel = document.getElementById('model');
+  if (p === 'anthropic') {
+    sel.innerHTML = `
+      <option value="claude-haiku-4-5-20251001">claude-haiku-4-5 (fast · default)</option>
+      <option value="claude-sonnet-4-20250514">claude-sonnet-4 (higher quality)</option>`;
+  } else {
+    sel.innerHTML = `
+      <option value="gpt-4o-mini">gpt-4o-mini (fast · default)</option>
+      <option value="gpt-4o">gpt-4o (higher quality)</option>
+      <option value="gpt-3.5-turbo">gpt-3.5-turbo (cheapest)</option>`;
+  }
+}
+
+function detectProvider(key) {
+  if (key.startsWith('sk-ant-')) return 'anthropic';
+  return 'openai';
+}
+
+// ════════════════════════════════════════════════════════════════
+// RAG — matches rag/rag_store.py keyword scoring
+// ════════════════════════════════════════════════════════════════
+function renderRag() {
+  const el = document.getElementById('ragList');
+  if (!ragDocs.length) { el.innerHTML='<div style="font-family:var(--mono);font-size:9px;color:var(--muted);padding:3px">No documents.</div>'; return; }
+  el.innerHTML = ragDocs.map(d=>`
+    <div class="rag-doc" onclick="toggleRag('${d.id}')">
+      <input type="checkbox" ${selRag.has(d.id)?'checked':''} onclick="event.stopPropagation();toggleRag('${d.id}')">
+      <div><div class="rag-dtitle">${d.title}</div><div class="rag-dprev">${d.content.slice(0,70)}…</div></div>
+    </div>`).join('');
+}
+function toggleRag(id){ selRag.has(id)?selRag.delete(id):selRag.add(id); renderRag(); }
+function toggleRagAdd(){ ragOpen=!ragOpen; document.getElementById('ragForm').style.display=ragOpen?'flex':'none'; }
+function addRag(){
+  const t=document.getElementById('rTitle').value.trim();
+  const c=document.getElementById('rContent').value.trim();
+  if(!t||!c) return;
+  const id='d'+Date.now();
+  ragDocs.push({id,title:t,content:c}); selRag.add(id);
+  document.getElementById('rTitle').value=''; document.getElementById('rContent').value='';
+  renderRag();
+}
+function ragContext(task) {
+  const active = ragDocs.filter(d=>selRag.has(d.id));
+  const qw = new Set((task.toLowerCase().match(/\w{3,}/g)||[]));
+  const scored = active.map(d=>{
+    const dw = new Set((d.title+' '+d.content).toLowerCase().match(/\w+/g)||[]);
+    const i = [...qw].filter(w=>dw.has(w)).length;
+    const u = new Set([...qw,...dw]).size;
+    return {score:u?i/u:0, doc:d};
+  }).sort((a,b)=>b.score-a.score).slice(0,3).filter(s=>s.score>0);
+  return scored.map(s=>`[RAG: ${s.doc.title}]\n${s.doc.content.slice(0,300)}`).join('\n\n');
+}
+
+// ════════════════════════════════════════════════════════════════
+// ASI — matches eval/agent_metrics.py _compute_asi() exactly
+// ════════════════════════════════════════════════════════════════
+function computeASI(agentId, task, output, elapsed, priorOutputs) {
+  // 1. Response Consistency (0.30)
+  const lens = [...priorOutputs.slice(-5).map(o=>(o.match(/\w+/g)||[]).length), (output.match(/\w+/g)||[]).length];
+  let rc = 100;
+  if (lens.length>1) {
+    const m=lens.reduce((a,b)=>a+b,0)/lens.length;
+    const v=lens.reduce((s,l)=>s+(l-m)**2,0)/lens.length;
+    rc = Math.max(0, 100 - Math.min(v/Math.max(m,1)*100, 100));
+  }
+  // 2. Reasoning Stability (0.25)
+  let rs = 100;
+  if (priorOutputs.length>0) {
+    const last = priorOutputs[priorOutputs.length-1];
+    const wa=new Set((output.match(/\w+/g)||[]).map(w=>w.toLowerCase()));
+    const wb=new Set((last.match(/\w+/g)||[]).map(w=>w.toLowerCase()));
+    const inter=[...wa].filter(w=>wb.has(w)).length;
+    const union=new Set([...wa,...wb]).size;
+    rs = union ? (inter/union)*100 : 100;
+  }
+  // 3. Task Adherence (0.35)
+  const tw = new Set((task.match(/\w{4,}/g)||[]).map(w=>w.toLowerCase()));
+  const ow = new Set((output.match(/\w+/g)||[]).map(w=>w.toLowerCase()));
+  const ta = tw.size ? ([...tw].filter(w=>ow.has(w)).length/tw.size)*100 : 100;
+  // 4. Latency Stability (0.10)
+  const hist = asiHist[agentId]||[];
+  const lats = [...hist.slice(-5).map(h=>h._elapsed||1), elapsed];
+  let ls = 100;
+  if (lats.length>1) {
+    const m=lats.reduce((a,b)=>a+b,0)/lats.length;
+    const v=lats.reduce((s,l)=>s+(l-m)**2,0)/lats.length;
+    ls = Math.max(0, 100-Math.min(v*10,100));
+  }
+  const asi = 0.30*rc + 0.25*rs + 0.35*ta + 0.10*ls;
+  return { asi:Math.round(asi*10)/10, response_consistency:Math.round(rc*10)/10,
+           reasoning_stability:Math.round(rs*10)/10, task_adherence:Math.round(ta*10)/10,
+           latency_stability:Math.round(ls*10)/10, _elapsed:elapsed };
+}
+
+// ════════════════════════════════════════════════════════════════
+// MEMORY — matches memory/memory_store.py
+// ════════════════════════════════════════════════════════════════
+function storeMem(agentId, key, value) {
+  memStore[agentId].push({key, value:value.slice(0,200)});
+  renderMem();
+}
+function retrieveMem(agentId, task) {
+  const entries = memStore[agentId]||[];
+  if (!entries.length) return '';
+  const qw = new Set((task.match(/\w+/g)||[]).map(w=>w.toLowerCase()));
+  const scored = entries.map(e=>{
+    const ew = new Set((e.value.match(/\w+/g)||[]).map(w=>w.toLowerCase()));
+    return {score:[...qw].filter(w=>ew.has(w)).length, value:e.value};
+  }).filter(s=>s.score>0).sort((a,b)=>b.score-a.score).slice(0,3);
+  return scored.length ? '\n\n[Memory]\n'+scored.map(s=>`- ${s.value}`).join('\n') : '';
+}
+function renderMem() {
+  const el = document.getElementById('memlist');
+  const all = AGENTS.flatMap(a=>(memStore[a.id]||[]).map(e=>({...e,aid:a.id,color:a.color})));
+  if (!all.length) { el.innerHTML='<div class="empty"><div class="ei">🧠</div><p>MEMORY LOG APPEARS DURING RUN</p></div>'; return; }
+  el.innerHTML = all.slice(-24).map(e=>`
+    <div class="mentry">
+      <div class="mns" style="color:${e.color}">${e.aid}</div>
+      <div class="mkey">${e.key}</div>
+      <div class="mval">${e.value}</div>
+    </div>`).join('');
+}
+
+// ════════════════════════════════════════════════════════════════
+// API CALLS — OpenAI + Anthropic
+// ════════════════════════════════════════════════════════════════
+async function callOpenAI(systemPrompt, userContent, apiKey, model) {
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+    body:JSON.stringify({
+      model: model||'gpt-4o-mini', max_tokens:600,
+      messages:[{role:'system',content:systemPrompt},{role:'user',content:userContent}]
+    })
+  });
+  if (!r.ok) { const e=await r.json().catch(()=>({})); throw new Error(e.error?.message||`OpenAI ${r.status}`); }
+  const d = await r.json();
+  return d.choices[0].message.content;
+}
+
+async function callAnthropic(systemPrompt, userContent, apiKey, model) {
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01'},
+    body:JSON.stringify({
+      model: model||'claude-haiku-4-5-20251001', max_tokens:600,
+      system:systemPrompt,
+      messages:[{role:'user',content:userContent}]
+    })
+  });
+  if (!r.ok) { const e=await r.json().catch(()=>({})); throw new Error(e.error?.message||`Anthropic ${r.status}`); }
+  const d = await r.json();
+  return d.content[0].text;
+}
+
+async function callAPI(systemPrompt, userContent, apiKey, model, provider) {
+  // If backend is running, use it (handles key server-side)
+  if (API_BASE) {
+    try {
+      const r = await fetch(API_BASE+'/');
+      if (r.ok) {
+        // Use backend endpoint — pass key in request body
+        const resp = await fetch(API_BASE+'/run', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({task:userContent, api_key:apiKey, model, provider})
+        });
+        // Backend runs full pipeline — not used per-agent here, fall through to direct
+      }
+    } catch {}
+  }
+  // Direct browser call (GitHub Pages / standalone mode)
+  if (provider==='anthropic') return callAnthropic(systemPrompt, userContent, apiKey, model);
+  return callOpenAI(systemPrompt, userContent, apiKey, model);
+}
+
+// ════════════════════════════════════════════════════════════════
+// STREAMING TEXT
+// ════════════════════════════════════════════════════════════════
+async function stream(el, text, delay=14) {
+  let out=''; el.className='obody cur';
+  for (let i=0;i<text.length;i+=3) {
+    out+=text.slice(i,i+3); el.textContent=out; await sleep(delay);
+  }
+  el.className='obody';
+}
+
+// ════════════════════════════════════════════════════════════════
+// PIPELINE RUNNER — matches orchestrator/pipeline.py run_pipeline()
+// ════════════════════════════════════════════════════════════════
+async function runPipeline() {
+  if (running) return;
+  const task = document.getElementById('task').value.trim();
+  const apiKey = document.getElementById('apikey').value.trim();
+  const providerSel = document.getElementById('provider').value;
+  const model = document.getElementById('model').value;
+
+  if (!task) { toast('Please enter a task.'); return; }
+  if (!apiKey) { toast('Please enter your API key (OpenAI sk-... or Anthropic sk-ant-...).'); return; }
+
+  const provider = providerSel==='auto' ? detectProvider(apiKey) : providerSel;
+
+  running = true;
+  AGENTS.forEach(a=>statuses[a.id]='idle');
+  document.getElementById('olist').innerHTML='';
+  setStatus('running'); startTimer(); setRunUI(true);
+
+  const runId = 'run_'+Date.now().toString(36);
+  const rag = ragContext(task);
+  let context = '';         // cumulative context passed between agents
+  const priorOutputs = {}; // per-agent prior outputs for ASI
+  AGENTS.forEach(a=>priorOutputs[a.id]=[]);
+  const results = [];
+
+  for (let i=0; i<AGENTS.length; i++) {
+    const agent = AGENTS[i];
+    statuses[agent.id]='active';
+    renderPipeline(); renderRoster();
+
+    // Build user content — matches base_agent.py run()
+    const mem = retrieveMem(agent.id, task);
+    let uc = `Task: ${task}`;
+    if (context.trim()) uc += `\n\nContext from prior agents:\n${context}`;
+    if (rag)            uc += `\n\nRAG Context:\n${rag}`;
+    if (mem)            uc += mem;
+
+    const cid = `c_${agent.id}_${runId}`;
+    addCard(agent, cid);
+
+    const ts = Date.now();
+    let output='';
+
+    try {
+      output = await callAPI(agent.prompt, uc, apiKey, model, provider);
+    } catch(e) {
+      statuses[agent.id]='error';
+      const b=document.getElementById('b_'+cid);
+      if(b) b.textContent=`[Error: ${e.message}]`;
+      document.getElementById(cid)?.classList.remove('streaming');
+      setStatus('error'); stopTimer(); setRunUI(false); running=false;
+      toast(e.message); renderPipeline(); renderRoster(); return;
+    }
+
+    const elapsed = (Date.now()-ts)/1000;
+
+    // Stream into card
+    const bodyEl = document.getElementById('b_'+cid);
+    if (bodyEl) await stream(bodyEl, output);
+    document.getElementById(cid)?.classList.remove('streaming');
+    const te=document.getElementById('t_'+cid);
+    if (te) te.textContent=elapsed.toFixed(2)+'s';
+
+    // Accumulate context — matches pipeline.py
+    context += `\n\n[${agent.name}]\n${output}`;
+
+    // Memory store
+    storeMem(agent.id, `run_${runId.slice(-6)}_${i}`, output);
+
+    // ASI
+    const scores = computeASI(agent.id, task, output, elapsed, priorOutputs[agent.id]);
+    asiHist[agent.id].push(scores);
+    priorOutputs[agent.id].push(output);
+
+    // Update badge
+    const ab=document.getElementById('a_'+cid);
+    if (ab) {
+      const c=scores.asi>=80?'#10b981':scores.asi>=60?'#f59e0b':'#ef4444';
+      ab.textContent=`ASI ${scores.asi}`;
+      ab.style.cssText=`background:${c}22;color:${c};border:1px solid ${c}44;padding:2px 7px;border-radius:9px;font-size:8px;font-family:var(--mono)`;
+    }
+    const ae=document.getElementById('asi_'+agent.id);
+    if (ae) { ae.textContent=`ASI ${scores.asi}`; ae.className='astat-lbl asi-lit'; }
+
+    results.push({agentId:agent.id,agentName:agent.name,output,elapsed,scores});
+    statuses[agent.id]='done';
+    renderPipeline(); renderRoster();
+    await sleep(200);
+  }
+
+  runHist.push({runId,task,model,provider,results,elapsed:(Date.now()-t0)/1000,ts:new Date().toISOString()});
+  renderMetrics(); renderHistory();
+  setStatus('complete'); stopTimer(); setRunUI(false); running=false;
+}
+
+// ════════════════════════════════════════════════════════════════
+// PIPELINE RENDER
+// ════════════════════════════════════════════════════════════════
+function renderPipeline() {
+  const bar=document.getElementById('pbar');
+  bar.innerHTML=AGENTS.map((a,i)=>{
+    const st=statuses[a.id]||'idle';
+    const isAct=st==='active', isDone=st==='done', isErr=st==='error';
+    const bc=st==='idle'?'var(--border)':isErr?'var(--crit)':a.color;
+    const bg=isAct?`radial-gradient(circle,${a.color}22,transparent 70%)`:isDone?`${a.color}10`:'var(--s2)';
+    const lastAsi=asiHist[a.id]?.slice(-1)[0]?.asi;
+    return `
+      <div class="anode">
+        <div class="aring ${isAct?'active':''} ${isDone?'done':''} ${isErr?'error-st':''}"
+          id="ring_${a.id}" style="border-color:${bc};background:${bg};color:${st==='idle'?'#253555':a.color}">
+          ${a.icon}
+          ${isAct?`<div class="ripple-ring" style="color:${a.color}"></div>`:''}
+          ${isDone?`<div class="done-badge">✓</div>`:''}
+          ${isErr?`<div class="err-badge">✗</div>`:''}
+        </div>
+        <div class="aname ${st!=='idle'?'lit':''}" style="${st!=='idle'?`color:${a.color}`:''}">
+          ${a.name.slice(0,7)}
+        </div>
+        <div class="astat-lbl ${lastAsi?'asi-lit':''}" id="asi_${a.id}">
+          ${lastAsi?`ASI ${lastAsi}`:isAct?'···':''}
+        </div>
+      </div>
+      ${i<AGENTS.length-1?`<div class="conn ${isDone||isAct?'on':''}" id="conn${i}"></div>`:''}
+    `;
+  }).join('');
+}
+
+function renderRoster() {
+  const el=document.getElementById('roster');
+  el.innerHTML=AGENTS.map(a=>{
+    const st=statuses[a.id]||'idle';
+    const sc=st==='done'?'#10b981':st==='active'?a.color:st==='error'?'var(--crit)':'var(--muted)';
+    return `
+      <div class="arow">
+        <div class="ar-ic" style="color:${st==='idle'?'var(--muted)':a.color}">${a.icon}</div>
+        <div class="ar-inf">
+          <div class="ar-nm" style="color:${st==='idle'?'var(--muted)':a.color}">${a.name}</div>
+          <div class="ar-rl">${a.role}</div>
+        </div>
+        <div class="ar-st" style="color:${sc}">${st.toUpperCase()}</div>
+      </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════════════
+// OUTPUT CARD
+// ════════════════════════════════════════════════════════════════
+function addCard(agent, cid) {
+  const list=document.getElementById('olist');
+  list.querySelector('.empty')?.remove();
+  const el=document.createElement('div');
+  el.className='ocard streaming'; el.id=cid;
+  el.innerHTML=`
+    <div class="ocard-hdr" style="border-left:3px solid ${agent.color}">
+      <span class="ocard-icon">${agent.icon}</span>
+      <span class="ocard-name" style="color:${agent.color}">${agent.name}</span>
+      <div class="ometa">
+        <span id="t_${cid}">running…</span>
+        <span id="a_${cid}" class="obadge" style="background:rgba(255,255,255,.04);color:var(--muted);border:1px solid var(--border)">ASI —</span>
+      </div>
+    </div>
+    <div class="obody cur" id="b_${cid}"></div>`;
+  list.appendChild(el);
+  setTimeout(()=>el.classList.add('show'),30);
+  el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// ════════════════════════════════════════════════════════════════
+// METRICS — matches eval/agent_metrics.py structure
+// ════════════════════════════════════════════════════════════════
+function asiColor(v){return v>=80?'#10b981':v>=60?'#f59e0b':'#ef4444'}
+
+function renderMetrics() {
+  const el=document.getElementById('mwrap');
+  const last=runHist[runHist.length-1];
+  if (!last) return;
+  const totRuns=runHist.length;
+  const avgEl=runHist.reduce((s,r)=>s+r.elapsed,0)/totRuns;
+  const allAsi=runHist.flatMap(r=>r.results.map(x=>x.scores.asi)).filter(Boolean);
+  const avgAsi=allAsi.length?allAsi.reduce((a,b)=>a+b,0)/allAsi.length:0;
+  const dl={response_consistency:'RC',reasoning_stability:'RS',task_adherence:'TA',latency_stability:'LS'};
+  const dw={response_consistency:30,reasoning_stability:25,task_adherence:35,latency_stability:10};
+
+  el.innerHTML=`
+    <div class="msumm">
+      <div class="mcard"><div class="mv" style="color:var(--orch)">${totRuns}</div><div class="ml">TOTAL RUNS</div></div>
+      <div class="mcard"><div class="mv" style="color:var(--res)">${avgAsi.toFixed(1)}</div><div class="ml">AVG ASI</div></div>
+      <div class="mcard"><div class="mv" style="color:var(--plan)">${avgEl.toFixed(1)}s</div><div class="ml">AVG ELAPSED</div></div>
+      <div class="mcard"><div class="mv" style="color:var(--exec);font-size:10px">${last.provider.toUpperCase()}</div><div class="ml">PROVIDER</div></div>
+    </div>
+    <div>
+      <div style="font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Last Run — Agent Stability Index</div>
+      ${last.results.map(r=>{
+        const s=r.scores; const c=asiColor(s.asi);
+        const hist=asiHist[r.agentId]||[];
+        const ag=AGENTS.find(a=>a.id===r.agentId);
+        return `
+          <div class="amet">
+            <div class="amhd">
+              <span class="amname" style="color:${ag?.color}">${ag?.icon} ${r.agentName}</span>
+              <span class="amasi" style="color:${c}">${s.asi}</span>
+            </div>
+            <div class="track"><div class="fill" id="f_${r.agentId}" style="background:${c}"></div></div>
+            <div class="dims">
+              ${Object.entries(dl).map(([k,lbl])=>`
+                <div class="dim-row">
+                  <span class="dim-l">${lbl} (${dw[k]}%)</span>
+                  <span class="dim-v" style="color:${asiColor(s[k]||0)}">${(s[k]||0).toFixed(1)}</span>
+                </div>`).join('')}
+            </div>
+            ${hist.length>1?`<div style="display:flex;gap:3px;margin-top:5px;align-items:center">
+              ${hist.slice(-12).map(h=>`<div style="width:5px;height:5px;border-radius:50%;background:${asiColor(h.asi)}" title="ASI ${h.asi}"></div>`).join('')}
+              <span style="font-family:var(--mono);font-size:7px;color:var(--muted);margin-left:4px">${hist.length} runs</span>
+            </div>`:''}
+          </div>`;
+      }).join('')}
+    </div>`;
+  setTimeout(()=>{ last.results.forEach(r=>{ const f=document.getElementById('f_'+r.agentId); if(f) f.style.width=r.scores.asi+'%'; }); }, 80);
+}
+
+function renderHistory() {
+  const el=document.getElementById('rhist');
+  if (!runHist.length) { el.innerHTML='<div class="empty"><div class="ei">📋</div><p>NO RUNS YET</p></div>'; return; }
+  el.innerHTML=runHist.slice().reverse().map(r=>{
+    const avg=r.results.reduce((s,x)=>s+x.scores.asi,0)/r.results.length;
+    return `<div class="hrow" onclick="loadRun('${r.runId}')">
+      <span class="hid">${r.runId.slice(-10)}</span>
+      <span class="htask">${r.task}</span>
+      <span class="hmeta">${r.results.length} agents · ${r.elapsed.toFixed(1)}s · ASI ${avg.toFixed(0)}</span>
+      <span class="hbadge">DONE</span>
+    </div>`;
+  }).join('');
+}
+
+function loadRun(runId) {
+  const run=runHist.find(r=>r.runId===runId); if(!run) return;
+  const list=document.getElementById('olist'); list.innerHTML='';
+  run.results.forEach(r=>{
+    const ag=AGENTS.find(a=>a.id===r.agentId);
+    const cid=`h_${runId}_${r.agentId}`;
+    const el=document.createElement('div'); el.className='ocard show'; el.id=cid;
+    const c=asiColor(r.scores.asi);
+    el.innerHTML=`
+      <div class="ocard-hdr" style="border-left:3px solid ${ag.color}">
+        <span class="ocard-icon">${ag.icon}</span>
+        <span class="ocard-name" style="color:${ag.color}">${ag.name}</span>
+        <div class="ometa">
+          <span>${r.elapsed.toFixed(2)}s</span>
+          <span class="obadge" style="background:${c}22;color:${c};border:1px solid ${c}44">ASI ${r.scores.asi}</span>
+        </div>
+      </div>
+      <div class="obody">${r.output}</div>`;
+    list.appendChild(el);
+  });
+  sw('output', document.querySelector('.tab.on'));
+}
+
+// ════════════════════════════════════════════════════════════════
+// UI HELPERS
+// ════════════════════════════════════════════════════════════════
+function sw(name, btn) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.tbody').forEach(t=>t.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  document.getElementById('tb-'+name)?.classList.add('on');
+}
+function setStatus(s) {
+  const d=document.getElementById('sdot'), l=document.getElementById('slabel');
+  d.className='dot'; d.style.background='';
+  if(s==='running'){d.classList.add('running');l.textContent='running';}
+  else if(s==='complete'){d.style.background='#10b981';d.style.boxShadow='0 0 6px #10b981';l.textContent='complete';}
+  else if(s==='error'){d.classList.add('error');l.textContent='error';}
+  else{l.textContent='idle';}
+}
+function setRunUI(r) {
+  const btn=document.getElementById('runBtn'), ic=document.getElementById('runIcon'), lb=document.getElementById('runLbl');
+  btn.disabled=r; lb.textContent=r?'PIPELINE RUNNING…':'EXECUTE PIPELINE';
+  ic.textContent=r?'⟳':'▶'; ic.className=r?'spin-anim':'';
+}
+function startTimer() {
+  t0=Date.now(); document.getElementById('timerPill').style.display='flex';
+  const v=document.getElementById('timerVal');
+  timer=setInterval(()=>v.textContent=((Date.now()-t0)/1000).toFixed(1)+'s',100);
+}
+function stopTimer(){ clearInterval(timer); }
+function toggleVis() {
+  showKey=!showKey;
+  document.getElementById('apikey').type=showKey?'text':'password';
+  document.getElementById('visBtn').textContent=showKey?'HIDE':'SHOW';
+}
+function toast(msg) {
+  const t=document.getElementById('toast'); t.textContent='⚠ '+msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),5000);
+}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+init();
+</script>
+</body>
+</html>
